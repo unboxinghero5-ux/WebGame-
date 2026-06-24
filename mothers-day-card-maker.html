@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Studio — Digital Greeting Card Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Dancing+Script:wght@500;700&family=Pacifico&family=Quicksand:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Noto+Sans+Tamil:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --rose:#e8638f; --rose-dark:#c23f6c; --rose-soft:#fce4ec;
+    --cream:#fff8f3; --ink:#3a2e33; --muted:#8a7a80;
+    --line:#f0dde4; --panel:#ffffff; --bg:#fbeef3;
+    --shadow:0 4px 20px rgba(180,80,120,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Quicksand',sans-serif; background:var(--bg); color:var(--ink);
+    min-height:100vh; -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .logo{
+    width:38px;height:38px;border-radius:12px;background:var(--rose);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;
+  }
+  .brand h1{font-size:20px;font-weight:700;color:var(--rose-dark);font-family:'Pacifico',cursive;font-weight:400}
+  .brand p{font-size:12px;color:var(--muted);margin-top:-2px}
+  .header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .lang-switch{display:flex;background:var(--rose-soft);border-radius:10px;padding:3px;gap:2px}
+  .lang-switch button{
+    padding:6px 11px;border-radius:8px;font-size:13px;font-weight:600;color:var(--rose-dark);
+    transition:.15s;
+  }
+  .lang-switch button.active{background:var(--rose);color:#fff}
+  .btn{
+    padding:9px 16px;border-radius:11px;font-weight:600;font-size:14px;
+    display:inline-flex;align-items:center;gap:7px;transition:.15s;white-space:nowrap;
+  }
+  .btn-primary{background:var(--rose);color:#fff}
+  .btn-primary:hover{background:var(--rose-dark)}
+  .btn-ghost{background:var(--rose-soft);color:var(--rose-dark)}
+  .btn-ghost:hover{background:#fad2de}
+  .btn svg{width:17px;height:17px}
+
+  /* ---------- Main layout ---------- */
+  .workspace{display:flex;flex:1;overflow:hidden}
+  .sidebar{
+    width:248px;background:var(--panel);overflow-y:auto;flex-shrink:0;
+    padding:16px 14px;
+  }
+  .sidebar.left{border-right:1px solid var(--line)}
+  .sidebar.right{border-left:1px solid var(--line);width:288px}
+  .stage{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:24px;overflow:auto;gap:14px;
+  }
+
+  .panel-title{
+    font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.06em;margin:18px 0 10px;display:flex;align-items:center;gap:7px;
+  }
+  .panel-title:first-child{margin-top:0}
+  .panel-title svg{width:15px;height:15px;color:var(--rose)}
+
+  /* ---------- Templates ---------- */
+  .tmpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .tmpl{
+    aspect-ratio:5/7;border-radius:11px;cursor:pointer;border:2.5px solid transparent;
+    overflow:hidden;position:relative;transition:.15s;display:flex;align-items:center;
+    justify-content:center;font-size:11px;font-weight:700;text-align:center;padding:6px;
+  }
+  .tmpl:hover{transform:translateY(-2px)}
+  .tmpl.active{border-color:var(--rose);box-shadow:0 0 0 3px rgba(232,99,143,.18)}
+  .tmpl span{position:relative;z-index:2;line-height:1.2}
+
+  /* ---------- Card canvas ---------- */
+  .card-frame{
+    background:#fff;border-radius:18px;box-shadow:var(--shadow);padding:0;
+    position:relative;
+  }
+  #card{
+    width:400px;height:560px;border-radius:16px;position:relative;overflow:hidden;
+    background:#fff;user-select:none;
+  }
+  .card-element{position:absolute;cursor:move;touch-action:none}
+  .card-element.text-el{
+    min-width:40px;padding:4px 8px;text-align:center;line-height:1.3;
+    word-break:break-word;max-width:90%;
+  }
+  .card-element.text-el[contenteditable="true"]{cursor:text;outline:none}
+  .card-element.sel{outline:2px dashed var(--rose);outline-offset:2px}
+  .card-element img{display:block;pointer-events:none}
+  .el-handle{
+    position:absolute;width:18px;height:18px;background:var(--rose);border:2px solid #fff;
+    border-radius:50%;z-index:50;display:none;
+  }
+  .card-element.sel .el-handle{display:block}
+  .el-handle.resize{bottom:-9px;right:-9px;cursor:nwse-resize}
+  .el-handle.delete{top:-9px;right:-9px;cursor:pointer;background:#e74c3c;
+    display:none;align-items:center;justify-content:center}
+  .card-element.sel .el-handle.delete{display:flex}
+  .el-handle.delete svg{width:11px;height:11px;color:#fff}
+  .el-handle.rotate{top:-9px;left:-9px;cursor:grab;background:#3498db;
+    display:none;align-items:center;justify-content:center}
+  .card-element.sel .el-handle.rotate{display:flex}
+  .el-handle.rotate svg{width:11px;height:11px;color:#fff}
+
+  .photo-frame{overflow:hidden;background:#f4e6ec;display:flex;align-items:center;justify-content:center}
+  .photo-frame.shape-circle{border-radius:50%}
+  .photo-frame.shape-heart{clip-path:polygon(50% 15%,58% 8%,68% 3%,80% 3%,92% 10%,98% 26%,95% 41%,85% 56%,70% 71%,55% 83%,50% 89%,45% 83%,30% 71%,15% 56%,5% 41%,2% 26%,8% 10%,20% 3%,32% 3%,42% 8%)}
+  .photo-frame.shape-square{border-radius:14px}
+  .photo-frame.shape-star{clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+  .photo-frame .ph-placeholder{font-size:12px;color:#b58da0;text-align:center;padding:10px;font-weight:600}
+
+  /* ---------- Right panel controls ---------- */
+  .ctl-row{display:flex;gap:7px;align-items:center;margin-bottom:9px;flex-wrap:wrap}
+  .ctl-row label{font-size:12px;font-weight:600;color:var(--muted);min-width:42px}
+  select,input[type="text"],textarea{
+    font-family:inherit;font-size:13px;padding:8px 10px;border:1.5px solid var(--line);
+    border-radius:9px;background:#fff;color:var(--ink);width:100%;outline:none;transition:.15s;
+  }
+  select:focus,input:focus,textarea:focus{border-color:var(--rose)}
+  .style-btns{display:flex;gap:5px}
+  .style-btns button{
+    width:34px;height:34px;border-radius:8px;background:var(--rose-soft);color:var(--rose-dark);
+    font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px;
+  }
+  .style-btns button.on{background:var(--rose);color:#fff}
+  .style-btns button svg{width:16px;height:16px}
+  .swatches{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .swatch{width:26px;height:26px;border-radius:7px;cursor:pointer;border:2px solid #fff;
+    box-shadow:0 0 0 1px var(--line);transition:.12s}
+  .swatch:hover{transform:scale(1.12)}
+  .swatch.on{box-shadow:0 0 0 2px var(--rose)}
+
+  .add-text-btn,.tool-btn{
+    width:100%;padding:11px;border-radius:11px;background:var(--rose-soft);color:var(--rose-dark);
+    font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;gap:7px;
+    margin-bottom:8px;transition:.15s;
+  }
+  .add-text-btn:hover,.tool-btn:hover{background:#fad2de}
+  .add-text-btn svg,.tool-btn svg{width:16px;height:16px}
+
+  /* ---------- Sticker packs ---------- */
+  .pack-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+  .pack-tabs button{
+    padding:6px 10px;border-radius:8px;font-size:12px;font-weight:600;
+    background:var(--rose-soft);color:var(--rose-dark);transition:.12s;
+  }
+  .pack-tabs button.active{background:var(--rose);color:#fff}
+  .sticker-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+  .sticker-grid button{
+    aspect-ratio:1;border-radius:10px;background:var(--cream);display:flex;
+    align-items:center;justify-content:center;transition:.12s;padding:5px;
+  }
+  .sticker-grid button:hover{background:var(--rose-soft);transform:scale(1.06)}
+  .sticker-grid button svg{width:100%;height:100%}
+
+  /* ---------- phrase chips ---------- */
+  .phrase-list{display:flex;flex-direction:column;gap:6px}
+  .phrase-chip{
+    text-align:left;padding:9px 11px;border-radius:10px;background:var(--cream);
+    font-size:13px;font-weight:500;color:var(--ink);transition:.12s;line-height:1.3;
+    border:1.5px solid var(--line);
+  }
+  .phrase-chip:hover{background:var(--rose-soft);border-color:var(--rose)}
+
+  .photo-shapes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+  .photo-shapes button{
+    aspect-ratio:1;border-radius:9px;background:var(--rose-soft);color:var(--rose-dark);
+    display:flex;align-items:center;justify-content:center;transition:.12s;
+  }
+  .photo-shapes button.on{background:var(--rose);color:#fff}
+  .photo-shapes button svg{width:20px;height:20px}
+
+  .hint{font-size:11px;color:var(--muted);line-height:1.4;margin-top:6px;text-align:center}
+
+  /* ---------- Stage bottom bar ---------- */
+  .stagebar{
+    display:flex;gap:9px;flex-wrap:wrap;justify-content:center;align-items:center;
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-bg{
+    position:fixed;inset:0;background:rgba(58,46,51,.55);display:none;
+    align-items:center;justify-content:center;z-index:100;padding:18px;
+  }
+  .modal-bg.show{display:flex}
+  .modal{
+    background:#fff;border-radius:20px;padding:24px;max-width:480px;width:100%;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:90vh;overflow:auto;
+  }
+  .modal h2{font-size:20px;font-weight:700;color:var(--rose-dark);margin-bottom:6px;display:flex;align-items:center;gap:9px}
+  .modal h2 svg{width:22px;height:22px}
+  .modal .sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+  .modal-close{position:absolute;top:14px;right:14px}
+  .draw-canvas-wrap{border:2px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}
+  #drawCanvas{display:block;touch-action:none;cursor:crosshair;width:100%}
+  .draw-tools{display:flex;align-items:center;gap:10px;margin:14px 0;flex-wrap:wrap}
+  .brush-colors{display:flex;gap:6px}
+  .brush-colors .swatch{width:24px;height:24px}
+  #qrcode{display:flex;justify-content:center;margin:14px 0;padding:14px;background:#fff;border-radius:12px}
+  #qrcode img,#qrcode canvas{border-radius:8px}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:12px 22px;border-radius:12px;font-weight:600;
+    font-size:14px;opacity:0;transition:.3s;z-index:200;pointer-events:none;box-shadow:var(--shadow);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* mobile */
+  @media(max-width:920px){
+    .workspace{flex-direction:column;overflow:auto}
+    .sidebar,.sidebar.right{width:100%;border:none;border-bottom:1px solid var(--line)}
+    .stage{order:-1}
+  }
+  /* print */
+  @media print{
+    body *{visibility:hidden}
+    #card,#card *{visibility:visible}
+    #card{position:fixed;left:50%;top:40px;transform:translateX(-50%);box-shadow:none}
+    .card-element.sel{outline:none!important}
+    .el-handle{display:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-8.5C.5 9 2 5.5 5 5.5c2 0 3 1.5 3.5 2.5C9 7 10 5.5 12 5.5s3 1.5 3.5 2.5C16 7 17 5.5 19 5.5c3 0 4.5 3.5 2.5 7C19 16.5 12 21 12 21z" fill="white" stroke="none"/></svg>
+      </div>
+      <div>
+        <h1>Card Studio</h1>
+        <p data-i18n="tagline">Design a card for someone you love</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="lang-switch" id="langSwitch">
+        <button data-lang="en" class="active">EN</button>
+        <button data-lang="ms">BM</button>
+        <button data-lang="ta">தமிழ்</button>
+        <button data-lang="zh">中文</button>
+      </div>
+      <button class="btn btn-ghost" onclick="openPreview()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span data-i18n="preview">Preview</span>
+      </button>
+      <button class="btn btn-primary" onclick="downloadPNG()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+        <span data-i18n="download">Download PNG</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <!-- LEFT: TEMPLATES -->
+    <aside class="sidebar left">
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <span data-i18n="templates">Templates</span>
+      </div>
+      <div class="tmpl-grid" id="tmplGrid"></div>
+
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>
+        <span data-i18n="background">Background</span>
+      </div>
+      <div class="swatches" id="bgSwatches"></div>
+    </aside>
+
+    <!-- CENTER: CANVAS -->
+    <main class="stage">
+      <div class="card-frame">
+        <div id="card"></div>
+      </div>
+      <div class="stagebar">
+        <button class="btn btn-ghost" onclick="openDraw()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          <span data-i18n="draw">Draw mum</span>
+        </button>
+        <button class="btn btn-ghost" onclick="openQR()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M20 20h1M17 17h1"/></svg>
+          <span data-i18n="qr">QR message</span>
+        </button>
+        <button class="btn btn-ghost" onclick="window.print()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span data-i18n="print">Print</span>
+        </button>
+        <button class="btn btn-ghost" onclick="clearCard()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          <span data-i18n="reset">Reset</span>
+        </button>
+      </div>
+      <p class="hint" data-i18n="canvas_hint">Tap any element to move, resize or delete it. Double-tap text to edit.</p>
+    </main>
+
+    <!-- RIGHT: TOOLS -->
+    <aside class="sidebar right">
+      <!-- Text -->
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+        <span data-i18n="text">Text & message</span>
+      </div>
+      <button class="add-text-btn" onclick="addText()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        <span data-i18n="add_text">Add text box</span>
+      </button>
+      <div class="ctl-row">
+        <select id="fontSelect" onchange="applyFont(this.value)">
+          <option value="'Quicksand',sans-serif">Quicksand</option>
+          <option value="'Caveat',cursive">Caveat (handwriting)</option>
+          <option value="'Dancing Script',cursive">Dancing Script</option>
+          <option value="'Pacifico',cursive">Pacifico</option>
+          <option value="'Playfair Display',serif">Playfair (elegant)</option>
+          <option value="'Comic Neue',cursive">Comic (fun)</option>
+          <option value="'Noto Sans Tamil',sans-serif">Noto Sans Tamil</option>
+          <option value="'Noto Sans SC',sans-serif">Noto Sans 中文</option>
+        </select>
+      </div>
+      <div class="ctl-row">
+        <label data-i18n="size">Size</label>
+        <input type="range" id="sizeRange" min="12" max="60" value="26" style="flex:1" oninput="applySize(this.value)">
+        <span id="sizeVal" style="font-size:12px;font-weight:700;min-width:28px">26</span>
+      </div>
+      <div class="ctl-row">
+        <div class="style-btns">
+          <button id="boldBtn" onclick="toggleStyle('bold')" style="font-family:serif">B</button>
+          <button id="italicBtn" onclick="toggleStyle('italic')" style="font-style:italic;font-family:serif">I</button>
+          <button id="underlineBtn" onclick="toggleStyle('underline')" style="text-decoration:underline;font-family:serif">U</button>
+        </div>
+      </div>
+      <div class="swatches" id="textColors"></div>
+
+      <!-- Greeting phrases -->
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span data-i18n="phrases">Ready greetings</span>
+      </div>
+      <button class="tool-btn" onclick="suggestMessage()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/><path d="M5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8z"/></svg>
+        <span data-i18n="suggest">Suggest a sweet message</span>
+      </button>
+      <div class="phrase-list" id="phraseList"></div>
+
+      <!-- Photo -->
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        <span data-i18n="photo">Photo</span>
+      </div>
+      <button class="tool-btn" onclick="document.getElementById('photoInput').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        <span data-i18n="upload">Upload a photo</span>
+      </button>
+      <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="loadPhoto(event)">
+      <p class="hint" data-i18n="photo_hint">Shape applies to selected photo</p>
+      <div class="photo-shapes" id="photoShapes">
+        <button data-shape="circle" class="on" title="Circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>
+        <button data-shape="heart" title="Heart"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.5-9.5-8.5C.5 9 2 5.5 5 5.5c2 0 3 1.5 3.5 2.5C9 7 10 5.5 12 5.5s3 1.5 3.5 2.5C16 7 17 5.5 19 5.5c3 0 4.5 3.5 2.5 7C19 16.5 12 21 12 21z"/></svg></button>
+        <button data-shape="square" title="Square"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/></svg></button>
+        <button data-shape="star" title="Star"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7-6.2-3.8L5.4 21l1.6-7L1.6 9.5l7.1-.6z"/></svg></button>
+      </div>
+
+      <!-- Stickers -->
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2h9l7-7V5a2 2 0 00-2-2z"/><path d="M15 21v-5a2 2 0 012-2h5"/></svg>
+        <span data-i18n="stickers">Stickers</span>
+      </div>
+      <div class="pack-tabs" id="packTabs"></div>
+      <div class="sticker-grid" id="stickerGrid"></div>
+
+      <!-- Border -->
+      <div class="panel-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/></svg>
+        <span data-i18n="border">Card border</span>
+      </div>
+      <div class="swatches" id="borderSwatches"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- DRAW MODAL -->
+<div class="modal-bg" id="drawModal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close btn-ghost btn" onclick="closeModal('drawModal')" style="padding:6px 10px">✕</button>
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/></svg><span data-i18n="draw_title">Draw a picture</span></h2>
+    <p class="sub" data-i18n="draw_sub">Draw your mum or a little gift, then add it to your card.</p>
+    <div class="draw-canvas-wrap"><canvas id="drawCanvas" width="420" height="320"></canvas></div>
+    <div class="draw-tools">
+      <div class="brush-colors" id="brushColors"></div>
+      <label style="font-size:12px;font-weight:600;color:var(--muted)" data-i18n="brush">Brush</label>
+      <input type="range" id="brushSize" min="2" max="30" value="6" style="width:90px">
+      <button class="btn btn-ghost" onclick="clearDraw()" data-i18n="clear">Clear</button>
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="addDrawing()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      <span data-i18n="add_draw">Add to card</span>
+    </button>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div class="modal-bg" id="qrModal">
+  <div class="modal" style="position:relative">
+    <button class="modal-close btn-ghost btn" onclick="closeModal('qrModal')" style="padding:6px 10px">✕</button>
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span data-i18n="qr_title">Secret QR message</span></h2>
+    <p class="sub" data-i18n="qr_sub">Type a secret message. We turn it into a QR code your mum can scan!</p>
+    <textarea id="qrText" rows="3" placeholder="I love you Mum ❤" data-i18n-ph="qr_ph"></textarea>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px" onclick="makeQR()">
+      <span data-i18n="make_qr">Make QR code</span>
+    </button>
+    <div id="qrcode"></div>
+    <button class="btn btn-ghost" id="addQrBtn" style="width:100%;justify-content:center;display:none" onclick="addQRtoCard()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      <span data-i18n="add_qr">Add QR to card</span>
+    </button>
+  </div>
+</div>
+
+<!-- PREVIEW MODAL -->
+<div class="modal-bg" id="previewModal">
+  <div class="modal" style="position:relative;text-align:center">
+    <button class="modal-close btn-ghost btn" onclick="closeModal('previewModal')" style="padding:6px 10px">✕</button>
+    <h2 style="justify-content:center"><span data-i18n="preview_title">Your card</span></h2>
+    <div id="previewImg" style="margin:14px 0"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="downloadPNG();closeModal('previewModal')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      <span data-i18n="download">Download PNG</span>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ DATA ============ */
+const TEMPLATES = [
+  {id:'rose',   name:{en:'Soft Rose',ms:'Mawar',ta:'ரோஜா',zh:'玫瑰'}, bg:'linear-gradient(160deg,#ffe0ec 0%,#fff5f8 55%,#ffd9e8 100%)', accent:'#c23f6c', font:"'Dancing Script',cursive", border:'#f4a7c4'},
+  {id:'sun',    name:{en:'Sunshine',ms:'Mentari',ta:'சூரியன்',zh:'阳光'}, bg:'linear-gradient(160deg,#fff3c4 0%,#fffdf0 55%,#ffe9a8 100%)', accent:'#c98a00', font:"'Pacifico',cursive", border:'#f2cd6b'},
+  {id:'lav',    name:{en:'Lavender',ms:'Lavender',ta:'லாவெண்டர்',zh:'薰衣草'}, bg:'linear-gradient(160deg,#e9e0ff 0%,#f8f5ff 55%,#ddd0ff 100%)', accent:'#6b4fc4', font:"'Caveat',cursive", border:'#c3aef0'},
+  {id:'mint',   name:{en:'Mint',ms:'Pudina',ta:'புதினா',zh:'薄荷'}, bg:'linear-gradient(160deg,#cdf5e6 0%,#f0fff9 55%,#b8efd9 100%)', accent:'#0f8a66', font:"'Quicksand',sans-serif", border:'#8fe0c4'},
+  {id:'cream',  name:{en:'Classic',ms:'Klasik',ta:'பாரம்பரியம்',zh:'经典'}, bg:'linear-gradient(160deg,#fdf6ec 0%,#fffdf9 55%,#f6ead5 100%)', accent:'#9a6b3f', font:"'Playfair Display',serif", border:'#d8c2a0'},
+  {id:'rainbow',name:{en:'Rainbow',ms:'Pelangi',ta:'வானவில்',zh:'彩虹'}, bg:'linear-gradient(160deg,#ffd6e0 0%,#fff0c4 35%,#d6f5d6 65%,#d0e8ff 100%)', accent:'#d4448a', font:"'Comic Neue',cursive", border:'#ffb3c8'},
+  {id:'night',  name:{en:'Night Sky',ms:'Langit Malam',ta:'இரவு வானம்',zh:'夜空'}, bg:'linear-gradient(160deg,#2b2255 0%,#3d2f6e 55%,#1f1a3d 100%)', accent:'#ffd9ec', font:"'Dancing Script',cursive", border:'#6b5aa8', dark:true},
+  {id:'blossom',name:{en:'Blossom',ms:'Bunga',ta:'மலர்',zh:'花开'}, bg:'linear-gradient(160deg,#ffe4ef 0%,#fff0f6 50%,#ffd1e3 100%)', accent:'#d14d86', font:"'Pacifico',cursive", border:'#f9b8d4'}
+];
+
+const BG_COLORS = ['#ffffff','#ffe0ec','#fff3c4','#e9e0ff','#cdf5e6','#fdf6ec','#ffd6e0','#2b2255','#d0e8ff','#ffe9a8','#f5d6ff','#d6f5d6'];
+const TEXT_COLORS = ['#c23f6c','#3a2e33','#ffffff','#d4448a','#6b4fc4','#0f8a66','#c98a00','#e74c3c','#2c3e50','#ff6f91','#9a6b3f','#1a73e8'];
+const BORDER_COLORS = ['none','#f4a7c4','#f2cd6b','#c3aef0','#8fe0c4','#d8c2a0','#ffb3c8','#6b5aa8'];
+
+/* ---- SVG sticker packs ---- */
+function svg(inner,vb){return `<svg viewBox="0 0 ${vb||100} ${vb||100}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`}
+const STICKERS = {
+  hearts:{name:{en:'Hearts',ms:'Hati',ta:'இதயம்',zh:'爱心'}, items:[
+    svg('<path d="M50,88 C20,62 6,50 6,32 C6,18 16,8 28,8 C38,8 46,15 50,24 C54,15 62,8 72,8 C84,8 94,18 94,32 C94,50 80,62 50,88Z" fill="#e8638f"/>'),
+    svg('<path d="M50,88 C20,62 6,50 6,32 C6,18 16,8 28,8 C38,8 46,15 50,24 C54,15 62,8 72,8 C84,8 94,18 94,32 C94,50 80,62 50,88Z" fill="#ff6f91"/>'),
+    svg('<path d="M50,88 C20,62 6,50 6,32 C6,18 16,8 28,8 C38,8 46,15 50,24 C54,15 62,8 72,8 C84,8 94,18 94,32 C94,50 80,62 50,88Z" fill="none" stroke="#c23f6c" stroke-width="6"/>'),
+    svg('<path d="M50,88 C20,62 6,50 6,32 C6,18 16,8 28,8 C38,8 46,15 50,24 C54,15 62,8 72,8 C84,8 94,18 94,32 C94,50 80,62 50,88Z" fill="#d4448a"/><path d="M50,80 C28,60 18,50 18,36 C18,26 25,20 33,20 C40,20 46,25 50,32" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".6"/>'),
+    svg('<g fill="#ff6f91"><path d="M30,52 C16,40 8,34 8,23 C8,14 15,8 22,8 C28,8 33,12 36,18 C39,12 44,8 50,8 C57,8 64,14 64,23 C64,34 56,40 30,52Z" transform="scale(.7) translate(8,8)"/><path d="M60,72 C46,60 38,54 38,43 C38,34 45,28 52,28 C58,28 63,32 66,38 C69,32 74,28 80,28 C87,28 94,34 94,43 C94,54 86,60 60,72Z"/></g>'),
+    svg('<text x="50" y="68" font-size="70" text-anchor="middle" fill="#e8638f">♥</text>'),
+    svg('<path d="M50,82 C24,60 12,50 12,34 C12,22 20,14 30,14 C38,14 45,19 50,27 C55,19 62,14 70,14 C80,14 88,22 88,34 C88,50 76,60 50,82Z" fill="#c23f6c"/><circle cx="36" cy="34" r="5" fill="#fff" opacity=".7"/>'),
+    svg('<g><path d="M50,70 C32,54 22,46 22,33 C22,24 28,18 36,18 C42,18 47,22 50,28 C53,22 58,18 64,18 C72,18 78,24 78,33 C78,46 68,54 50,70Z" fill="#ffd9ec" stroke="#e8638f" stroke-width="3"/></g>')
+  ]},
+  flowers:{name:{en:'Flowers',ms:'Bunga',ta:'மலர்கள்',zh:'花朵'}, items:[
+    svg('<g><circle cx="50" cy="50" r="12" fill="#ffd54f"/><g fill="#ff6f91"><ellipse cx="50" cy="26" rx="11" ry="16"/><ellipse cx="50" cy="74" rx="11" ry="16"/><ellipse cx="26" cy="50" rx="16" ry="11"/><ellipse cx="74" cy="50" rx="16" ry="11"/><ellipse cx="33" cy="33" rx="13" ry="9" transform="rotate(45 33 33)"/><ellipse cx="67" cy="33" rx="13" ry="9" transform="rotate(-45 67 33)"/><ellipse cx="33" cy="67" rx="13" ry="9" transform="rotate(-45 33 67)"/><ellipse cx="67" cy="67" rx="13" ry="9" transform="rotate(45 67 67)"/></g><circle cx="50" cy="50" r="12" fill="#ffd54f"/></g>'),
+    svg('<g><g fill="#c77dff"><ellipse cx="50" cy="28" rx="10" ry="18"/><ellipse cx="28" cy="55" rx="10" ry="18" transform="rotate(60 28 55)"/><ellipse cx="72" cy="55" rx="10" ry="18" transform="rotate(-60 72 55)"/></g><circle cx="50" cy="50" r="11" fill="#ffd54f"/></g>'),
+    svg('<g><path d="M50,80 L50,42" stroke="#3aa856" stroke-width="5"/><g fill="#ff8fb3"><ellipse cx="50" cy="24" rx="9" ry="15"/><ellipse cx="36" cy="34" rx="9" ry="15" transform="rotate(40 36 34)"/><ellipse cx="64" cy="34" rx="9" ry="15" transform="rotate(-40 64 34)"/></g><circle cx="50" cy="32" r="8" fill="#fff3c4"/></g>'),
+    svg('<g><circle cx="50" cy="50" r="14" fill="#8b5a2b"/><g fill="#ffc233"><ellipse cx="50" cy="22" rx="8" ry="16"/><ellipse cx="50" cy="78" rx="8" ry="16"/><ellipse cx="22" cy="50" rx="16" ry="8"/><ellipse cx="78" cy="50" rx="16" ry="8"/><ellipse cx="30" cy="30" rx="14" ry="7" transform="rotate(45 30 30)"/><ellipse cx="70" cy="30" rx="14" ry="7" transform="rotate(-45 70 30)"/><ellipse cx="30" cy="70" rx="14" ry="7" transform="rotate(-45 30 70)"/><ellipse cx="70" cy="70" rx="14" ry="7" transform="rotate(45 70 70)"/></g><circle cx="50" cy="50" r="14" fill="#a86c34"/></g>'),
+    svg('<g><g fill="#ff6f91" opacity=".9"><circle cx="38" cy="42" r="13"/><circle cx="62" cy="42" r="13"/><circle cx="32" cy="58" r="12"/><circle cx="68" cy="58" r="12"/><circle cx="50" cy="64" r="13"/></g><circle cx="50" cy="50" r="10" fill="#fff3c4"/></g>'),
+    svg('<g><path d="M50,82 L50,46" stroke="#3aa856" stroke-width="4"/><path d="M50,60 Q38,52 32,58 Q42,64 50,60" fill="#3aa856"/><g fill="#e85d9e"><ellipse cx="50" cy="26" rx="7" ry="13"/><ellipse cx="38" cy="32" rx="7" ry="13" transform="rotate(45 38 32)"/><ellipse cx="62" cy="32" rx="7" ry="13" transform="rotate(-45 62 32)"/><ellipse cx="42" cy="42" rx="7" ry="13" transform="rotate(20 42 42)"/><ellipse cx="58" cy="42" rx="7" ry="13" transform="rotate(-20 58 42)"/></g><circle cx="50" cy="34" r="6" fill="#fff"/></g>'),
+    svg('<g fill="#ff9ec7"><circle cx="50" cy="30" r="10"/><circle cx="30" cy="45" r="10"/><circle cx="70" cy="45" r="10"/><circle cx="38" cy="68" r="10"/><circle cx="62" cy="68" r="10"/></g><circle cx="50" cy="50" r="9" fill="#ffe07a"/>'),
+    svg('<g><g fill="#b388ff"><ellipse cx="50" cy="30" rx="8" ry="14"/><ellipse cx="32" cy="44" rx="8" ry="14" transform="rotate(72 32 44)"/><ellipse cx="68" cy="44" rx="8" ry="14" transform="rotate(-72 68 44)"/><ellipse cx="38" cy="66" rx="8" ry="14" transform="rotate(36 38 66)"/><ellipse cx="62" cy="66" rx="8" ry="14" transform="rotate(-36 62 66)"/></g><circle cx="50" cy="50" r="9" fill="#fff3c4"/></g>')
+  ]},
+  cute:{name:{en:'Cute',ms:'Comel',ta:'அழகு',zh:'可爱'}, items:[
+    svg('<g><path d="M30,40 Q30,20 50,20 Q70,20 70,40 L70,55 Q70,78 50,78 Q30,78 30,55Z" fill="#ffb3c8"/><circle cx="42" cy="46" r="4" fill="#3a2e33"/><circle cx="58" cy="46" r="4" fill="#3a2e33"/><path d="M44,58 Q50,64 56,58" stroke="#c23f6c" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="36" cy="56" r="5" fill="#ff7aa8" opacity=".5"/><circle cx="64" cy="56" r="5" fill="#ff7aa8" opacity=".5"/></g>'),
+    svg('<g><circle cx="50" cy="52" r="26" fill="#fff0c4" stroke="#f2cd6b" stroke-width="3"/><circle cx="30" cy="30" r="11" fill="#fff0c4" stroke="#f2cd6b" stroke-width="3"/><circle cx="70" cy="30" r="11" fill="#fff0c4" stroke="#f2cd6b" stroke-width="3"/><circle cx="42" cy="50" r="3.5" fill="#3a2e33"/><circle cx="58" cy="50" r="3.5" fill="#3a2e33"/><path d="M46,60 Q50,64 54,60" stroke="#3a2e33" stroke-width="2.5" fill="none"/><path d="M50,55 l-3,3 6,0z" fill="#ff9ec7"/></g>'),
+    svg('<g><ellipse cx="50" cy="55" rx="24" ry="22" fill="#d7c4f5"/><path d="M30,40 L24,22 L40,34Z" fill="#d7c4f5"/><path d="M70,40 L76,22 L60,34Z" fill="#d7c4f5"/><circle cx="42" cy="52" r="4" fill="#3a2e33"/><circle cx="58" cy="52" r="4" fill="#3a2e33"/><ellipse cx="50" cy="60" rx="4" ry="3" fill="#ff7aa8"/><path d="M44,64 Q50,68 56,64" stroke="#6b4fc4" stroke-width="2" fill="none"/></g>'),
+    svg('<g><circle cx="50" cy="50" r="30" fill="#ffd966"/><circle cx="40" cy="44" r="4" fill="#3a2e33"/><circle cx="60" cy="44" r="4" fill="#3a2e33"/><path d="M38,60 Q50,72 62,60" stroke="#3a2e33" stroke-width="3.5" fill="none" stroke-linecap="round"/><circle cx="34" cy="56" r="5" fill="#ff9e9e" opacity=".6"/><circle cx="66" cy="56" r="5" fill="#ff9e9e" opacity=".6"/></g>'),
+    svg('<g><ellipse cx="50" cy="58" rx="22" ry="20" fill="#fff"/><ellipse cx="50" cy="58" rx="22" ry="20" fill="none" stroke="#e0e0e0" stroke-width="2"/><circle cx="38" cy="36" r="13" fill="#fff" stroke="#e0e0e0" stroke-width="2"/><circle cx="62" cy="36" r="13" fill="#fff" stroke="#e0e0e0" stroke-width="2"/><circle cx="38" cy="36" r="6" fill="#ffb3c8"/><circle cx="62" cy="36" r="6" fill="#ffb3c8"/><circle cx="44" cy="56" r="3" fill="#3a2e33"/><circle cx="56" cy="56" r="3" fill="#3a2e33"/><ellipse cx="50" cy="62" rx="3" ry="2" fill="#ff9ec7"/></g>'),
+    svg('<g><path d="M50,80 C30,80 22,64 22,50 C22,32 34,22 50,22 C66,22 78,32 78,50 C78,64 70,80 50,80Z" fill="#ffc4d6"/><circle cx="40" cy="46" r="3.5" fill="#3a2e33"/><circle cx="60" cy="46" r="3.5" fill="#3a2e33"/><circle cx="50" cy="54" r="3" fill="#c23f6c"/><path d="M40,28 Q50,18 60,28" stroke="#ff9ec7" stroke-width="4" fill="none"/></g>'),
+    svg('<g><rect x="28" y="34" width="44" height="40" rx="10" fill="#a0d8ff"/><circle cx="40" cy="50" r="4" fill="#3a2e33"/><circle cx="60" cy="50" r="4" fill="#3a2e33"/><path d="M42,60 Q50,66 58,60" stroke="#3a2e33" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M34,34 L34,24 M66,34 L66,24" stroke="#a0d8ff" stroke-width="4" stroke-linecap="round"/><circle cx="34" cy="22" r="4" fill="#ff6f91"/><circle cx="66" cy="22" r="4" fill="#ffd54f"/></g>'),
+    svg('<g><path d="M50,24 L58,42 L78,44 L62,57 L67,77 L50,66 L33,77 L38,57 L22,44 L42,42Z" fill="#ffd54f"/><circle cx="44" cy="50" r="2.5" fill="#3a2e33"/><circle cx="56" cy="50" r="2.5" fill="#3a2e33"/><path d="M45,57 Q50,61 55,57" stroke="#3a2e33" stroke-width="2" fill="none"/></g>')
+  ]},
+  decor:{name:{en:'Decor',ms:'Hiasan',ta:'அலங்காரம்',zh:'装饰'}, items:[
+    svg('<g><path d="M50,40 L30,68 L70,68Z" fill="#ff6f91"/><path d="M50,40 C40,30 30,34 35,46 C30,40 22,44 26,54 L50,40Z" fill="#e85d9e"/><path d="M50,40 C60,30 70,34 65,46 C70,40 78,44 74,54 L50,40Z" fill="#e85d9e"/><circle cx="50" cy="40" r="6" fill="#ffd54f"/></g>'),
+    svg('<g><ellipse cx="50" cy="38" rx="20" ry="24" fill="#ff8fb3"/><path d="M50,62 L46,78 L54,78Z" fill="#ffd54f"/><ellipse cx="43" cy="32" rx="6" ry="9" fill="#fff" opacity=".5"/></g>'),
+    svg('<g><path d="M20,50 Q35,30 50,50 Q65,70 80,50" fill="none" stroke="#ff6f91" stroke-width="6" stroke-linecap="round"/><circle cx="50" cy="50" r="9" fill="#ffd54f"/><path d="M40,45 L36,38 M60,45 L64,38" stroke="#c23f6c" stroke-width="4" stroke-linecap="round"/></g>'),
+    svg('<g fill="#ffd54f"><path d="M50,14 L56,38 L80,38 L60,54 L68,78 L50,62 L32,78 L40,54 L20,38 L44,38Z"/></g><path d="M50,14 L56,38 L80,38 L60,54 L68,78 L50,62 L32,78 L40,54 L20,38 L44,38Z" fill="none" stroke="#f0b400" stroke-width="2"/>'),
+    svg('<g><rect x="44" y="44" width="12" height="40" fill="#3aa856"/><path d="M50,16 C42,28 30,30 30,44 C30,54 39,60 50,60 C61,60 70,54 70,44 C70,30 58,28 50,16Z" fill="#5cc977"/></g>'),
+    svg('<g><path d="M50,18 C46,30 36,32 36,42 C36,50 42,54 50,54 C58,54 64,50 64,42 C64,32 54,30 50,18Z" fill="#7ed957"/><path d="M50,40 C46,52 36,54 36,64 C36,72 42,76 50,76 C58,76 64,72 64,64 C64,54 54,52 50,40Z" fill="#5cb947"/></g>'),
+    svg('<g><circle cx="50" cy="50" r="6" fill="#ffd54f"/><g stroke="#ffd54f" stroke-width="5" stroke-linecap="round"><path d="M50,30 L50,16"/><path d="M50,70 L50,84"/><path d="M30,50 L16,50"/><path d="M70,50 L84,50"/><path d="M36,36 L26,26"/><path d="M64,36 L74,26"/><path d="M36,64 L26,74"/><path d="M64,64 L74,74"/></g></g>'),
+    svg('<g><path d="M25,40 Q50,20 75,40" fill="none" stroke="#c77dff" stroke-width="5"/><circle cx="30" cy="42" r="6" fill="#ff6f91"/><circle cx="45" cy="32" r="6" fill="#ffd54f"/><circle cx="55" cy="32" r="6" fill="#7ed957"/><circle cx="70" cy="42" r="6" fill="#5aa3ff"/></g>')
+  ]},
+  words:{name:{en:'Words',ms:'Kata',ta:'வார்த்தைகள்',zh:'文字'}, items:[
+    svg('<g><rect x="6" y="32" width="88" height="36" rx="18" fill="#ff6f91"/><text x="50" y="56" font-family="Quicksand,sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="#fff">LOVE</text></g>'),
+    svg('<g><rect x="6" y="32" width="88" height="36" rx="18" fill="#ffd54f"/><text x="50" y="55" font-family="Pacifico,cursive" font-size="17" text-anchor="middle" fill="#9a6b00">Thank you</text></g>'),
+    svg('<g><rect x="6" y="32" width="88" height="36" rx="18" fill="#c77dff"/><text x="50" y="56" font-family="Quicksand,sans-serif" font-size="22" font-weight="700" text-anchor="middle" fill="#fff">MUM</text></g>'),
+    svg('<g><rect x="6" y="30" width="88" height="40" rx="20" fill="#5cc977"/><text x="50" y="55" font-family="Dancing Script,cursive" font-size="22" font-weight="700" text-anchor="middle" fill="#fff">Best</text></g>'),
+    svg('<g><rect x="4" y="34" width="92" height="32" rx="16" fill="#5aa3ff"/><text x="50" y="55" font-family="Quicksand,sans-serif" font-size="15" font-weight="700" text-anchor="middle" fill="#fff">XOXO</text></g>'),
+    svg('<g><circle cx="50" cy="50" r="32" fill="#ff8fb3"/><text x="50" y="46" font-family="Quicksand,sans-serif" font-size="13" font-weight="700" text-anchor="middle" fill="#fff">FOR</text><text x="50" y="62" font-family="Quicksand,sans-serif" font-size="13" font-weight="700" text-anchor="middle" fill="#fff">YOU</text></g>'),
+    svg('<g><rect x="6" y="30" width="88" height="40" rx="20" fill="#ffd54f"/><text x="50" y="55" font-family="Caveat,cursive" font-size="24" font-weight="700" text-anchor="middle" fill="#c98a00">Hi Mum</text></g>'),
+    svg('<g><path d="M50,84 C20,58 8,46 8,30 C8,18 17,10 27,10 C36,10 44,16 50,26 C56,16 64,10 73,10 C83,10 92,18 92,30 C92,46 80,58 50,84Z" fill="#e8638f"/><text x="50" y="44" font-family="Quicksand,sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">I ♥</text><text x="50" y="58" font-family="Quicksand,sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">YOU</text></g>')
+  ]}
+};
+
+/* ---- greeting phrases ---- */
+const PHRASES = {
+  en:['Happy Mother\'s Day!','I love you, Mum ❤','Best Mum in the world','Thank you for everything','You are my sunshine','Forever grateful for you'],
+  ms:['Selamat Hari Ibu!','Ibu, saya sayang ibu ❤','Ibu terbaik di dunia','Terima kasih atas segalanya','Ibu cahaya hidupku','Ibu segala-galanya'],
+  ta:['அன்னை தின வாழ்த்துக்கள்!','அம்மா, உன்னை நேசிக்கிறேன் ❤','உலகின் சிறந்த அம்மா','எல்லாவற்றிற்கும் நன்றி','நீங்கள் என் வெளிச்சம்','என்றும் நன்றியுடன்'],
+  zh:['母亲节快乐！','妈妈，我爱你 ❤','世界上最好的妈妈','谢谢您所做的一切','您是我的阳光','永远感激您']
+};
+
+const AI_MESSAGES = {
+  en:['Dear Mum,\nThank you for your love and endless care. You make every day brighter.\nI love you so much! ❤',
+      'To the best Mum ever,\nEvery hug, every smile, every meal — thank you. You are my hero.\nHappy Mother\'s Day!',
+      'Mummy,\nYou hold our whole family together with so much love. I am lucky to be your child.\nWith all my heart 💕'],
+  ms:['Ibu tersayang,\nTerima kasih atas kasih sayang dan jagaan tanpa henti. Ibu membuat hidupku ceria.\nSayang ibu selalu! ❤',
+      'Buat ibu terbaik,\nSetiap pelukan, setiap senyuman — terima kasih. Ibu wira hatiku.\nSelamat Hari Ibu!',
+      'Ibu,\nIbu menyatukan keluarga kita dengan kasih sayang. Bertuah aku menjadi anak ibu.\nDengan sepenuh hati 💕'],
+  ta:['அன்புள்ள அம்மா,\nஉங்கள் அன்பிற்கும் அக்கறைக்கும் நன்றி. ஒவ்வொரு நாளையும் ஒளிமயமாக்குகிறீர்கள்.\nஉங்களை நேசிக்கிறேன்! ❤',
+      'சிறந்த அம்மாவிற்கு,\nஒவ்வொரு அணைப்பும், புன்னகையும் — நன்றி. நீங்கள் என் நாயகி.\nஅன்னை தின வாழ்த்துக்கள்!',
+      'அம்மா,\nஅன்போடு நம் குடும்பத்தை இணைக்கிறீர்கள். உங்கள் பிள்ளையாக இருப்பது பெருமை.\nமனப்பூர்வமாக 💕'],
+  zh:['亲爱的妈妈，\n谢谢您无尽的爱与照顾，让我每一天都充满阳光。\n我好爱您！❤',
+      '致最好的妈妈，\n每一个拥抱、每一个微笑，谢谢您。您是我的英雄。\n母亲节快乐！',
+      '妈妈，\n您用满满的爱把家凝聚在一起。能做您的孩子我很幸运。\n用我全部的心 💕']
+};
+
+/* ---- i18n UI strings ---- */
+const I18N = {
+  en:{tagline:'Design a card for someone you love',preview:'Preview',download:'Download PNG',templates:'Templates',background:'Background',text:'Text & message',add_text:'Add text box',size:'Size',phrases:'Ready greetings',suggest:'Suggest a sweet message',photo:'Photo',upload:'Upload a photo',photo_hint:'Shape applies to selected photo',stickers:'Stickers',border:'Card border',draw:'Draw mum',qr:'QR message',print:'Print',reset:'Reset',canvas_hint:'Tap any element to move, resize or delete it. Double-tap text to edit.',draw_title:'Draw a picture',draw_sub:'Draw your mum or a little gift, then add it to your card.',brush:'Brush',clear:'Clear',add_draw:'Add to card',qr_title:'Secret QR message',qr_sub:'Type a secret message. We turn it into a QR code your mum can scan!',qr_ph:'I love you Mum ❤',make_qr:'Make QR code',add_qr:'Add QR to card',preview_title:'Your card',default_text:'Happy\nMother\'s Day!'},
+  ms:{tagline:'Reka kad untuk orang tersayang',preview:'Pratonton',download:'Muat turun PNG',templates:'Templat',background:'Latar belakang',text:'Teks & mesej',add_text:'Tambah kotak teks',size:'Saiz',phrases:'Ucapan siap',suggest:'Cadang mesej manis',photo:'Foto',upload:'Muat naik foto',photo_hint:'Bentuk untuk foto dipilih',stickers:'Pelekat',border:'Sempadan kad',draw:'Lukis ibu',qr:'Mesej QR',print:'Cetak',reset:'Set semula',canvas_hint:'Ketik elemen untuk gerak, saiz atau padam. Ketik dua kali teks untuk edit.',draw_title:'Lukis gambar',draw_sub:'Lukis ibu anda atau hadiah kecil, kemudian tambah ke kad.',brush:'Berus',clear:'Padam',add_draw:'Tambah ke kad',qr_title:'Mesej QR rahsia',qr_sub:'Taip mesej rahsia. Kami jadikan kod QR untuk ibu imbas!',qr_ph:'Sayang ibu ❤',make_qr:'Buat kod QR',add_qr:'Tambah QR ke kad',preview_title:'Kad anda',default_text:'Selamat\nHari Ibu!'},
+  ta:{tagline:'நேசிப்பவருக்கு அட்டை வடிவமைக்கவும்',preview:'முன்னோட்டம்',download:'PNG பதிவிறக்கு',templates:'வார்ப்புருக்கள்',background:'பின்னணி',text:'உரை & செய்தி',add_text:'உரை சேர்',size:'அளவு',phrases:'தயார் வாழ்த்துகள்',suggest:'இனிய செய்தியை பரிந்துரை',photo:'புகைப்படம்',upload:'புகைப்படம் பதிவேற்று',photo_hint:'தேர்ந்த படத்திற்கு வடிவம்',stickers:'ஸ்டிக்கர்கள்',border:'அட்டை எல்லை',draw:'அம்மாவை வரை',qr:'QR செய்தி',print:'அச்சிடு',reset:'மீட்டமை',canvas_hint:'நகர்த்த/அளவு/நீக்க தொடவும். உரையை திருத்த இருமுறை தட்டவும்.',draw_title:'படம் வரையவும்',draw_sub:'அம்மாவை அல்லது சிறு பரிசை வரைந்து அட்டையில் சேர்க்கவும்.',brush:'தூரிகை',clear:'அழி',add_draw:'அட்டையில் சேர்',qr_title:'ரகசிய QR செய்தி',qr_sub:'ரகசிய செய்தியை தட்டச்சு செய்யவும். அம்மா ஸ்கேன் செய்யலாம்!',qr_ph:'அம்மா உன்னை நேசிக்கிறேன் ❤',make_qr:'QR உருவாக்கு',add_qr:'QR ஐ சேர்',preview_title:'உங்கள் அட்டை',default_text:'அன்னை தின\nவாழ்த்துக்கள்!'},
+  zh:{tagline:'为你爱的人设计贺卡',preview:'预览',download:'下载PNG',templates:'模板',background:'背景',text:'文字与祝福',add_text:'添加文字',size:'大小',phrases:'现成祝福',suggest:'推荐温馨祝福',photo:'照片',upload:'上传照片',photo_hint:'形状应用于所选照片',stickers:'贴纸',border:'卡片边框',draw:'画妈妈',qr:'QR祝福',print:'打印',reset:'重置',canvas_hint:'点击元素可移动、缩放或删除。双击文字可编辑。',draw_title:'画一幅画',draw_sub:'画下你的妈妈或小礼物，然后添加到卡片。',brush:'画笔',clear:'清除',add_draw:'添加到卡片',qr_title:'秘密QR祝福',qr_sub:'输入秘密祝福，生成妈妈可扫描的二维码！',qr_ph:'妈妈我爱你 ❤',make_qr:'生成二维码',add_qr:'添加二维码',preview_title:'你的卡片',default_text:'母亲节\n快乐！'}
+};
+
+/* ============ STATE ============ */
+let lang='en', selected=null, curFont="'Dancing Script',cursive", curSize=26, curColor='#c23f6c', curStyle={bold:false,italic:false,underline:false}, photoShape='circle', curPack='hearts', zCounter=10;
+const card=document.getElementById('card');
+
+/* ============ INIT ============ */
+function init(){
+  buildTemplates(); buildBgSwatches(); buildTextColors(); buildBorderSwatches();
+  buildPackTabs(); buildStickers(); buildBrushColors(); buildLangSwitch();
+  applyTemplate(TEMPLATES[0]);
+  applyLang('en');
+  // default text
+  addText(I18N.en.default_text, true);
+}
+
+/* ---- Templates ---- */
+function buildTemplates(){
+  const g=document.getElementById('tmplGrid'); g.innerHTML='';
+  TEMPLATES.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='tmpl'+(i===0?' active':''); d.style.background=t.bg;
+    d.dataset.id=t.id;
+    d.innerHTML=`<span style="color:${t.accent};font-family:${t.font}">${t.name[lang]}</span>`;
+    d.onclick=()=>{document.querySelectorAll('.tmpl').forEach(x=>x.classList.remove('active'));d.classList.add('active');applyTemplate(t)};
+    g.appendChild(d);
+  });
+}
+function applyTemplate(t){
+  card.style.background=t.bg;
+  card.dataset.border=t.border;
+  setBorder(t.border);
+  curFont=t.font; document.getElementById('fontSelect').value=t.font;
+  curColor=t.accent;
+  // recolor existing single default text if untouched
+}
+
+/* ---- Backgrounds ---- */
+function buildBgSwatches(){
+  const g=document.getElementById('bgSwatches'); g.innerHTML='';
+  BG_COLORS.forEach(c=>{
+    const s=document.createElement('div'); s.className='swatch'; s.style.background=c;
+    s.onclick=()=>{card.style.background=c;document.querySelectorAll('#bgSwatches .swatch').forEach(x=>x.classList.remove('on'));s.classList.add('on')};
+    g.appendChild(s);
+  });
+}
+
+/* ---- Border ---- */
+function buildBorderSwatches(){
+  const g=document.getElementById('borderSwatches'); g.innerHTML='';
+  BORDER_COLORS.forEach(c=>{
+    const s=document.createElement('div'); s.className='swatch';
+    s.style.background = c==='none'?'#fff':c;
+    if(c==='none'){s.style.position='relative';s.innerHTML='<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#c23f6c;font-weight:700">✕</span>'}
+    s.onclick=()=>{setBorder(c);document.querySelectorAll('#borderSwatches .swatch').forEach(x=>x.classList.remove('on'));s.classList.add('on')};
+    g.appendChild(s);
+  });
+}
+function setBorder(c){
+  if(!c||c==='none'){card.style.border='none';card.style.boxShadow='none';}
+  else{card.style.border='10px solid '+c;}
+}
+
+/* ---- Text colors ---- */
+function buildTextColors(){
+  const g=document.getElementById('textColors'); g.innerHTML='';
+  TEXT_COLORS.forEach((c,i)=>{
+    const s=document.createElement('div'); s.className='swatch'+(i===0?' on':''); s.style.background=c;
+    if(c==='#ffffff')s.style.boxShadow='0 0 0 1px #ddd';
+    s.onclick=()=>{curColor=c;document.querySelectorAll('#textColors .swatch').forEach(x=>x.classList.remove('on'));s.classList.add('on');if(selected&&selected.classList.contains('text-el'))selected.style.color=c};
+    g.appendChild(s);
+  });
+}
+
+/* ============ TEXT ELEMENTS ============ */
+function addText(txt, isDefault){
+  const el=document.createElement('div');
+  el.className='card-element text-el';
+  el.contentEditable='false';
+  el.style.fontFamily=curFont; el.style.fontSize=curSize+'px'; el.style.color=curColor;
+  el.style.left='60px'; el.style.top=(isDefault?'60px':'180px');
+  el.style.zIndex=++zCounter;
+  el.innerText = txt || (lang==='en'?'Your text':I18N[lang].add_text);
+  addHandles(el);
+  makeDraggable(el);
+  el.addEventListener('dblclick',()=>{el.contentEditable='true';el.focus();selectEl(el);
+    document.execCommand&&document.getSelection().selectAllChildren(el);});
+  el.addEventListener('blur',()=>{el.contentEditable='false'});
+  card.appendChild(el);
+  selectEl(el);
+}
+function applyFont(f){curFont=f;if(selected&&selected.classList.contains('text-el'))selected.style.fontFamily=f}
+function applySize(v){curSize=v;document.getElementById('sizeVal').innerText=v;if(selected&&selected.classList.contains('text-el'))selected.style.fontSize=v+'px'}
+function toggleStyle(s){
+  curStyle[s]=!curStyle[s];
+  document.getElementById(s+'Btn').classList.toggle('on',curStyle[s]);
+  if(selected&&selected.classList.contains('text-el')){
+    selected.style.fontWeight=curStyle.bold?'700':'400';
+    selected.style.fontStyle=curStyle.italic?'italic':'normal';
+    selected.style.textDecoration=curStyle.underline?'underline':'none';
+  }
+}
+
+/* ============ STICKERS ============ */
+function buildPackTabs(){
+  const t=document.getElementById('packTabs'); t.innerHTML='';
+  Object.keys(STICKERS).forEach((k,i)=>{
+    const b=document.createElement('button'); b.innerText=STICKERS[k].name[lang];
+    b.className=(i===0?'active':''); b.dataset.pack=k;
+    b.onclick=()=>{curPack=k;document.querySelectorAll('#packTabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');buildStickers()};
+    t.appendChild(b);
+  });
+}
+function buildStickers(){
+  const g=document.getElementById('stickerGrid'); g.innerHTML='';
+  STICKERS[curPack].items.forEach(s=>{
+    const b=document.createElement('button'); b.innerHTML=s;
+    b.onclick=()=>addSticker(s);
+    g.appendChild(b);
+  });
+}
+function addSticker(svgStr){
+  const el=document.createElement('div');
+  el.className='card-element sticker-el';
+  el.style.width='80px'; el.style.height='80px';
+  el.style.left='150px'; el.style.top='220px'; el.style.zIndex=++zCounter;
+  el.innerHTML=`<div style="width:100%;height:100%;pointer-events:none">${svgStr}</div>`;
+  el.querySelector('svg').style.width='100%'; el.querySelector('svg').style.height='100%';
+  addHandles(el); makeDraggable(el); card.appendChild(el); selectEl(el);
+}
+
+/* ============ PHOTO ============ */
+document.getElementById('photoShapes').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  photoShape=b.dataset.shape;
+  document.querySelectorAll('#photoShapes button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  if(selected&&selected.classList.contains('photo-el')){
+    const f=selected.querySelector('.photo-frame');
+    f.className='photo-frame shape-'+photoShape;
+  }
+});
+function loadPhoto(e){
+  const file=e.target.files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const el=document.createElement('div');
+    el.className='card-element photo-el';
+    el.style.width='150px'; el.style.height='150px';
+    el.style.left='120px'; el.style.top='180px'; el.style.zIndex=++zCounter;
+    el.innerHTML=`<div class="photo-frame shape-${photoShape}" style="width:100%;height:100%"><img src="${ev.target.result}" style="width:100%;height:100%;object-fit:cover" crossorigin="anonymous"></div>`;
+    addHandles(el); makeDraggable(el); card.appendChild(el); selectEl(el);
+  };
+  r.readAsDataURL(file);
+  e.target.value='';
+}
+
+/* ============ HANDLES + DRAG + RESIZE ============ */
+function addHandles(el){
+  const del=document.createElement('div'); del.className='el-handle delete';
+  del.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+  del.addEventListener('pointerdown',e=>{e.stopPropagation();el.remove();selected=null});
+  const rs=document.createElement('div'); rs.className='el-handle resize';
+  rs.addEventListener('pointerdown',e=>startResize(e,el));
+  el.appendChild(del); el.appendChild(rs);
+}
+function selectEl(el){
+  if(selected)selected.classList.remove('sel');
+  selected=el; el.classList.add('sel'); el.style.zIndex=++zCounter;
+  // sync controls for text
+  if(el.classList.contains('text-el')){
+    const cs=getComputedStyle(el);
+    document.getElementById('sizeRange').value=parseInt(cs.fontSize);
+    document.getElementById('sizeVal').innerText=parseInt(cs.fontSize);
+  }
+}
+function makeDraggable(el){
+  el.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.el-handle'))return;
+    if(el.contentEditable==='true')return;
+    selectEl(el);
+    const r=card.getBoundingClientRect();
+    const ox=e.clientX-el.offsetLeft, oy=e.clientY-el.offsetTop;
+    el.setPointerCapture(e.pointerId);
+    function mv(ev){
+      let nx=ev.clientX-ox, ny=ev.clientY-oy;
+      nx=Math.max(-20,Math.min(nx,card.offsetWidth-20));
+      ny=Math.max(-20,Math.min(ny,card.offsetHeight-20));
+      el.style.left=nx+'px'; el.style.top=ny+'px';
+    }
+    function up(ev){el.releasePointerCapture(e.pointerId);el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up)}
+    el.addEventListener('pointermove',mv); el.addEventListener('pointerup',up);
+  });
+}
+function startResize(e,el){
+  e.stopPropagation(); e.preventDefault(); selectEl(el);
+  const sx=e.clientX, sy=e.clientY;
+  const sw=el.offsetWidth, sh=el.offsetHeight;
+  const isText=el.classList.contains('text-el');
+  const sf=isText?parseInt(getComputedStyle(el).fontSize):0;
+  rs_handle=el.querySelector('.resize');
+  function mv(ev){
+    const dx=ev.clientX-sx;
+    if(isText){
+      const nf=Math.max(12,Math.min(72,sf+dx*0.4));
+      el.style.fontSize=nf+'px'; curSize=Math.round(nf);
+      document.getElementById('sizeRange').value=curSize;document.getElementById('sizeVal').innerText=curSize;
+    }else{
+      const ratio=sh/sw;
+      const nw=Math.max(40,sw+dx);
+      el.style.width=nw+'px'; el.style.height=(nw*ratio)+'px';
+    }
+  }
+  function up(){document.removeEventListener('pointermove',mv);document.removeEventListener('pointerup',up)}
+  document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
+}
+// deselect on canvas tap
+card.addEventListener('pointerdown',e=>{if(e.target===card){if(selected){selected.classList.remove('sel');selected=null}}});
+
+/* ============ PHRASES + AI ============ */
+function buildPhrases(){
+  const g=document.getElementById('phraseList'); g.innerHTML='';
+  PHRASES[lang].forEach(p=>{
+    const b=document.createElement('button'); b.className='phrase-chip'; b.innerText=p;
+    b.onclick=()=>addText(p);
+    g.appendChild(b);
+  });
+}
+let aiIdx=0;
+function suggestMessage(){
+  const msgs=AI_MESSAGES[lang];
+  const m=msgs[aiIdx%msgs.length]; aiIdx++;
+  curFont="'Caveat',cursive"; document.getElementById('fontSelect').value="'Caveat',cursive";
+  curSize=22;
+  addText(m);
+  toast(lang==='en'?'Sweet message added! ✨':lang==='ms'?'Mesej manis ditambah! ✨':lang==='ta'?'செய்தி சேர்க்கப்பட்டது! ✨':'已添加祝福！✨');
+}
+
+/* ============ DRAW MODAL ============ */
+let drawCtx, drawing=false, brushColor='#c23f6c', brushSize=6;
+function openDraw(){openModal('drawModal');setupDraw()}
+function setupDraw(){
+  const c=document.getElementById('drawCanvas');
+  drawCtx=c.getContext('2d');
+  drawCtx.lineCap='round';drawCtx.lineJoin='round';
+  drawCtx.fillStyle='#fff';drawCtx.fillRect(0,0,c.width,c.height);
+  let drawn=false;
+  function pos(e){const r=c.getBoundingClientRect();const sx=c.width/r.width;return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sx}}
+  c.onpointerdown=e=>{drawing=true;drawn=true;const p=pos(e);drawCtx.beginPath();drawCtx.moveTo(p.x,p.y);c.setPointerCapture(e.pointerId)};
+  c.onpointermove=e=>{if(!drawing)return;const p=pos(e);drawCtx.strokeStyle=brushColor;drawCtx.lineWidth=brushSize;drawCtx.lineTo(p.x,p.y);drawCtx.stroke()};
+  c.onpointerup=()=>drawing=false;
+  c._drawn=()=>drawn;
+}
+function buildBrushColors(){
+  const g=document.getElementById('brushColors'); g.innerHTML='';
+  ['#c23f6c','#3a2e33','#ff6f91','#ffd54f','#5cc977','#5aa3ff','#c77dff','#a86c34'].forEach((c,i)=>{
+    const s=document.createElement('div');s.className='swatch'+(i===0?' on':'');s.style.background=c;
+    s.onclick=()=>{brushColor=c;document.querySelectorAll('#brushColors .swatch').forEach(x=>x.classList.remove('on'));s.classList.add('on')};
+    g.appendChild(s);
+  });
+  document.getElementById('brushSize').oninput=e=>brushSize=+e.target.value;
+}
+function clearDraw(){const c=document.getElementById('drawCanvas');drawCtx.fillStyle='#fff';drawCtx.fillRect(0,0,c.width,c.height)}
+function addDrawing(){
+  const c=document.getElementById('drawCanvas');
+  const data=c.toDataURL('image/png');
+  const el=document.createElement('div'); el.className='card-element draw-el';
+  el.style.width='160px';el.style.height='122px';el.style.left='110px';el.style.top='190px';el.style.zIndex=++zCounter;
+  el.innerHTML=`<img src="${data}" style="width:100%;height:100%;object-fit:contain;border-radius:8px">`;
+  addHandles(el);makeDraggable(el);card.appendChild(el);selectEl(el);
+  closeModal('drawModal');
+  toast(lang==='en'?'Drawing added! 🎨':'🎨');
+}
+
+/* ============ QR MODAL ============ */
+let qrDataUrl=null;
+function openQR(){openModal('qrModal');document.getElementById('qrcode').innerHTML='';document.getElementById('addQrBtn').style.display='none';qrDataUrl=null}
+function makeQR(){
+  const txt=document.getElementById('qrText').value.trim()||I18N[lang].qr_ph;
+  const box=document.getElementById('qrcode'); box.innerHTML='';
+  new QRCode(box,{text:txt,width:170,height:170,colorDark:'#3a2e33',colorLight:'#ffffff'});
+  setTimeout(()=>{
+    const img=box.querySelector('img')||box.querySelector('canvas');
+    if(img){qrDataUrl=img.tagName==='IMG'?img.src:img.toDataURL();document.getElementById('addQrBtn').style.display='flex'}
+  },120);
+}
+function addQRtoCard(){
+  if(!qrDataUrl)return;
+  const el=document.createElement('div');el.className='card-element qr-el';
+  el.style.width='90px';el.style.height='90px';el.style.left='150px';el.style.top='260px';el.style.zIndex=++zCounter;
+  el.innerHTML=`<img src="${qrDataUrl}" style="width:100%;height:100%;border-radius:6px;background:#fff;padding:4px">`;
+  addHandles(el);makeDraggable(el);card.appendChild(el);selectEl(el);
+  closeModal('qrModal');
+}
+
+/* ============ EXPORT ============ */
+function deselectAll(){if(selected){selected.classList.remove('sel');selected=null}}
+function downloadPNG(){
+  deselectAll();
+  toast(lang==='en'?'Saving…':lang==='ms'?'Menyimpan…':lang==='ta'?'சேமிக்கிறது…':'保存中…');
+  html2canvas(card,{scale:2,useCORS:true,backgroundColor:null,logging:false}).then(cv=>{
+    const a=document.createElement('a');
+    a.download='mothers-day-card.png';
+    a.href=cv.toDataURL('image/png');
+    a.click();
+    toast(lang==='en'?'Card saved! 🎉':lang==='ms'?'Kad disimpan! 🎉':lang==='ta'?'சேமிக்கப்பட்டது! 🎉':'已保存！🎉');
+  });
+}
+function openPreview(){
+  deselectAll();
+  html2canvas(card,{scale:2,useCORS:true,backgroundColor:null,logging:false}).then(cv=>{
+    const box=document.getElementById('previewImg'); box.innerHTML='';
+    const img=new Image(); img.src=cv.toDataURL('image/png');
+    img.style.maxWidth='260px';img.style.borderRadius='14px';img.style.boxShadow='0 8px 30px rgba(0,0,0,.2)';
+    box.appendChild(img);
+    openModal('previewModal');
+  });
+}
+function clearCard(){
+  if(!confirm(lang==='en'?'Clear the whole card?':lang==='ms'?'Padam semua kad?':lang==='ta'?'அட்டையை அழிக்கவா?':'清空整张卡片？'))return;
+  card.querySelectorAll('.card-element').forEach(e=>e.remove());selected=null;
+}
+
+/* ============ MODAL + TOAST ============ */
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show')}));
+let toastT;
+function toast(msg){const t=document.getElementById('toast');t.innerText=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200)}
+
+/* ============ LANGUAGE ============ */
+function buildLangSwitch(){
+  document.querySelectorAll('#langSwitch button').forEach(b=>{
+    b.onclick=()=>{document.querySelectorAll('#langSwitch button').forEach(x=>x.classList.remove('active'));b.classList.add('active');applyLang(b.dataset.lang)};
+  });
+}
+function applyLang(l){
+  lang=l;
+  document.querySelectorAll('[data-i18n]').forEach(e=>{const k=e.dataset.i18n;if(I18N[l][k])e.innerText=I18N[l][k]});
+  document.querySelectorAll('[data-i18n-ph]').forEach(e=>{const k=e.dataset.i18nPh;if(I18N[l][k])e.placeholder=I18N[l][k]});
+  buildPhrases(); buildPackTabs(); buildStickers();
+  // refresh template labels
+  document.querySelectorAll('.tmpl').forEach((d,i)=>{const t=TEMPLATES[i];d.querySelector('span').innerText=t.name[l]});
+}
+
+init();
+
+</script>
+</body>
+</html>
